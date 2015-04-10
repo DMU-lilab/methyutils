@@ -1,5 +1,5 @@
 exportPattern("^[[:alpha:]]+")
 
-useDynLib(statistics)
+useDynLib(methyutils)
 export(ChisqTest)
 export(MultiChisqTest)

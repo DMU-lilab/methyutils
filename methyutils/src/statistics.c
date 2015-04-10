@@ -16,7 +16,7 @@ SEXP _ChisqTest(SEXP vect, SEXP nrow, SEXP ncol)
 
 SEXP _MultiChisqTest(SEXP vect, SEXP ncount, SEXP nrow, SEXP ncol)
 {
-	int i, j;
+	int i;
 	double *pData = NULL;
 	double *pPvalue = NULL;
 
