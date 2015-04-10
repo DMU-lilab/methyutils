@@ -1,18 +1,21 @@
-\name{foo}
-\alias{foo}
+\name{chisqtest}
+\alias{chisqtest}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-%%  ~~function to do ... ~~
+	Calculate Chi-Square Tests
 }
 \description{
-%%  ~~ A concise (1-5 lines) description of what the function does. ~~
+	Perform Pearson's Chi-Square Tests based on contingency table or perform batch 
+	Pearson's Chi-Square Tests on a list of contingency tables.
 }
 \usage{
-foo()
+	ChisqTest(data);
+	MultiChisqTest(data);
 }
 %- maybe also 'usage' for other objects documented here.
 \details{
-%%  ~~ If necessary, more details than the description above ~~
+	ChisqTest(data);
+	MultiChisqTest(data);
 }
 \value{
 %%  ~Describe the value returned
@@ -20,15 +23,16 @@ foo()
 %%  \item{comp1 }{Description of 'comp1'}
 %%  \item{comp2 }{Description of 'comp2'}
 %% ...
+	Return P-value or a vector of P-values.
 }
 \references{
 %% ~put references to the literature/web site here ~
 }
 \author{
-%%  ~~who you are~~
+	dengxiaodi
 }
 \note{
-%%  ~~further notes~~
+	More information about Chi-Square tests implementation. 
 }
 
 %% ~Make other sections like Warning with \section{Warning }{....} ~
