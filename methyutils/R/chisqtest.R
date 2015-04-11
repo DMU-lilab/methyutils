@@ -16,5 +16,5 @@ MultiChisqTest <- function(data, nrow, ncol) {
 		stop("ncount is not a multiple of contingency table size ( = nrow * ncol).")
 	}
 
-	.Call("_MultiChisqTest", data, data.size, as.integer(nrow), as.integer(ncol))
+	.Call("_MultiChisqTest", as.numeric(data), data.size, as.integer(nrow), as.integer(ncol))
 }
