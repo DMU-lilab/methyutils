@@ -61,9 +61,11 @@ GetCGmtbr <- function(mtbr, cg.position){
 	# put rC and rT for a CG site in one row by melting first and then casting
 	
 	m <- melt(cg.mtbr, id=c("chrom","posi","gBase"), variable.name="read", value.name="cv") 
+	# melt "+" "-" strand methylation
+	m$posi[m$gBase == "G"] <- m$posi[m$gBase == "G"] - 1
 	cst <- dcast(m, chrom + posi ~ read + gBase, value.var="cv")
 	colnames(cst) <- c("chrom", "posi", "rC_p", "rC_n", "rT_p", "rT_n")
-	
+		
 	return(cst)
 }
 
