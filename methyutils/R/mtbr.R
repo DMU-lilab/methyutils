@@ -165,7 +165,8 @@ WriteMixedWig <- function(cgmtbr,wigfilePath,chr){
 }
 
 
-GetValueFromMtbrByRegion <- function(cg.mtbr,region,geonome="mm9"){
+
+GetValueFromMtbrByRegion <- function(cg.mtbr,region,genome="mm9"){
 		################################
 		##region is a data.frame with 3 columns of chrom, start, and end
 		###############################
@@ -173,49 +174,158 @@ GetValueFromMtbrByRegion <- function(cg.mtbr,region,geonome="mm9"){
 		colnames(region) <- c("chrom","start","end")
 		cg.mtbr$rC <- cg.mtbr$rC_p + cg.mtbr$rC_n
 		cg.mtbr$rT <- cg.mtbr$rT_p + cg.mtbr$rT_n
-		cg.mtbr$coverNum <- cg.mtbr$rC + cg.mtbr$rT
-		cg.mtbr$st <- findInterval(cg.mtbr$posi,region$start) 
-		cg.mtbr$en <- findInterval(cg.mtbr$posi,region$end+1)+1 
-		cgmtbrInregion <- cg.mtbr[cg.mtbr$st==cg.mtbr$en,]
-		# count the region rC rT and coverNum
-		rC <- c()
-		rT <- c()
-		coverNum <- c()
-			for (j in c(1:length(region$chrom))){
-			a <- sum(cgmtbrInregion[cgmtbrInregion$st == j,7])
-			b <- sum(cgmtbrInregion[cgmtbrInregion$st == j,8])
-			c <- sum(cgmtbrInregion[cgmtbrInregion$st == j,9])
-			rC <- c(rC,a)
-			rT <- c(rT,b)
-			coverNum <- c(coverNum,c)
-		}
-		region$rC <- rC
-		region$rT <- rT
-		region$coverNum <- coverNum
-		region$score <- region$rC/region$coverNum
-		#region <- region[!is.na(region$score),]
-		# count region cgNum
+		
+		# count region's rC rT coverNum score and cgNum
 		chr <- unique(cg.mtbr$chrom)
-		library("methyutils")
-		if(geonome == "mm9"){
-		
-			library(BSgenome.Mmusculus.UCSC.mm9)
+			
+		if(genome == "mm9"){
+			library("BSgenome.Hsapiens.UCSC.hg19")
 			dna.seq <- Mmusculus[[chr]]
-			cposition <- GetCcontextPosition(dna.seq)
-			region$cgNum <- apply(region[,c("start","end")], 1, function(rg)sum(cposition[rg["start"]:rg["end"]]))
-			return(region)
-		}
-		else if (type == "hg19"){
-		
-			library(BSgenome.Hsapiens.UCSC.hg19)
+		}else if (genome == "hg19"){
+			library("BSgenome.Hsapiens.UCSC.hg19")
 			dna.seq <- Hsapiens[[chr]]
-			cposition <- GetCcontextPosition(dna.seq)
-			region$cgNum <- apply(region[,c("start","end")], 1, function(rg)sum(cposition[rg["start"]:rg["end"]]))
-			return(region)
+		}else {
+			 stop("undefined genome. Only mm9 and hg19 are available now.")
 		}
-		else {
-			 stop("undefined type. Only mm9 and hg19 are available now.")
-		}
-} 
+		
+		cposition <- GetCcontextPosition(dna.seq)
+		region$cgNum <- apply(region[,c("start","end")], 1, function(rg)sum(cposition[rg["start"]:rg["end"]]))
+		## 
+		rC <- integer(length(dna.seq))
+		rC[cg.mtbr$posi] <- cg.mtbr$rC
+		rT <- integer(length(dna.seq))
+		rT[cg.mtbr$posi] <- cg.mtbr$rT
+		coverNum <- rC + rT
+		##
+		cgCovermtbr <- cg.mtbr[cg.mtbr$rC>0,]
+		cgCover <- logical(length(dna.seq))
+		cgCover[cgCovermtbr$posi] <- TRUE
+		##
+		region$rC <- apply(region[,c("start","end")], 1, function(rg)sum(rC[rg["start"]:rg["end"]]))
+		region$rT <- apply(region[,c("start","end")], 1, function(rg)sum(rT[rg["start"]:rg["end"]]))
+		region$cgCover <- apply(region[,c("start","end")], 1, function(rg)sum(cgCover[rg["start"]:rg["end"]]))
+		region$coverNum <- region$rC + region$rT
+		region$score <- region$rC/region$coverNum
+			
+		return(region)
+}
+		
+##sliding windows
+swsCalc<-function(x, win=list(L=75, R=75)){
+    library(zoo)
+    xLen <- length(x)
+    winLen<-win$L + win$R + 1
+    sws <- rollsum(x,winLen)
+    sws_head<-tail(cumsum(x[1:(winLen-1)]),win$L)
+    sws_tail<-rev(tail(cumsum(rev(x[(xLen - winLen + 2):xLen])),win$R))
+    sws <- append(sws_head, sws)
+    sws <- append(sws, sws_tail)
+    return(sws)
+}
+
+##regionAsBed
+regionAsBed <- function(marker, cf.length=5, tolerance.length=NULL,chrom){
+    #library(zoo)
+    r <- rle(marker)
+    if(is.null(tolerance.length)){
+        ##The tolerance length is NUL, which means any number of false
+        ##values, even 1, can break a regionn into two.
+        end <- with(r,cumsum(lengths)[values & lengths>cf.length])
+        start <- end - with(r,lengths[values & lengths>cf.length]) + 1
+        #df <- data.frame(chrom,start,end)
+        if(length(start) == 0 || length(end) == 0){
+            df <- data.frame(chrom=character(), start=integer(), end=integer())
+        } else {
+            df <- data.frame(chrom, start, end)
+        }
+    } else {
+        ##Tolerance length is not null, which means if the number of false
+        ##is less than or equal to tolerance length, the two regions will
+        ##be combined together
+        ##Get all the starts and ends
+        end<-cumsum(r$lengths)
+        start<-end - r$lengths + 1
+        revision.mk <- with(r, lengths<=tolerance.length & !values)
+        ##The position that need to be revised
+        revision.posi <- data.frame(cbind(start,end))[revision.mk,]
+        ##revise the orignal marker 
+        invisible(apply(revision.posi, 1, function(x) marker[x[1]:x[2]] <<- T))
+        r <- rle(marker)
+        end <- with(r,cumsum(lengths)[values & lengths>cf.length])
+        start <- end - with(r,lengths[values & lengths>cf.length]) + 1
+        if(length(start) == 0 || length(end) == 0){
+            df <- data.frame(chrom=character(), start=integer(), end=integer())
+        } else {
+            df <- data.frame(chrom, start, end)
+        }
+
+    }
+    return(df)
+}
+
+##cgDensity
+
+cgDensity <- function(cg.mtbr,genome="mm9",window=300,maxpercent=0.005,overlap=40,gap=-40,cf.length=100, tolerance.length=2){
+		
+	cg.mtbr$rC <- cg.mtbr$rC_p + cg.mtbr$rC_n
+	cg.mtbr$rT <- cg.mtbr$rT_p + cg.mtbr$rT_n
+		
+	# count region's rC rT coverNum score and cgNum
+	chr <- unique(cg.mtbr$chrom)
+			
+	if(genome == "mm9"){
+		library("BSgenome.Hsapiens.UCSC.hg19")
+		dna.seq <- Mmusculus[[chr]]
+	}else if (genome == "hg19"){
+		library("BSgenome.Hsapiens.UCSC.hg19")
+		dna.seq <- Hsapiens[[chr]]
+	}else {
+		 stop("undefined genome. Only mm9 and hg19 are available now.")
+	}
+		
+	## get the CG positon
+	cposition <- GetCcontextPosition(dna.seq)
+	## get the rC and rT 
+	rC <- integer(length(dna.seq))
+	rC[cg.mtbr$posi] <- cg.mtbr$rC
+	rT <- integer(length(dna.seq))
+	rT[cg.mtbr$posi] <- cg.mtbr$rT
+	## slidingwindow the cg ,rC and rT
+	win <- list(L=window,R=window)
+	cgs <- swsCalc(cposition,win)
+	rCs <- swsCalc(rC,win)
+        rTs <- swsCalc(rT,win)
+        ## get methylation score
+        score <- rCs/(rCs + rTs)
+        score[is.na(score[])] <- 0
+	##unity the cg number
+        ordcgs <- order(cgs)
+        maxNum <- cgs[ordcgs[length(dna.seq)*(1-maxpercent)]]
+        cgsu <- cgs*(100/maxNum)
+        cgsu[cgsu[]>=100] <- 100
+	##unity the methylation
+	scoreu <- score * 100
+	## make one data.frame for cg and methylation
+        cs <- data.frame(posi=1:length(cgsu), cg=cgsu[], methy=scoreu[])
+        cs$icmp <- cs$cg + cs$methy - 100
+        ##cutoff for incomplemtarity
+        cutoff <- list(gap=gap, overlap=overlap, len=cf.length, tolerate=tolerance.length)
+        ##marker for overlap and gap incomplementarity
+        mlap <- cs$icmp > cutoff$overlap
+        mgap <- cs$icmp < cutoff$gap
+	##find incomplementary overlap and gap regions
+	rglap <- regionAsBed(marker=mlap, cf.length=cutoff$len, tolerance.length=cutoff$tolerate,chrom=chr)
+	rggap <- regionAsBed(marker=mgap, cf.length=cutoff$len, tolerance.length=cutoff$tolerate,chrom=chr)
+	##covernt index to chrom coordinate
+	rglapc <- data.frame(chrom=rglap$chrom, start=cs$posi[rglap$start], end=cs$posi[rglap$end])
+	rggapc <- data.frame(chrom=rggap$chrom, start=cs$posi[rggap$start], end=cs$posi[rggap$end])
+	## gap and overlap content
+	icmpValue <- list()
+	icmpValue$overlap <- rglapc
+	icmpValue$gap <- rggapc
+		
+	return(icmpValue)
+				
+}
 
 
