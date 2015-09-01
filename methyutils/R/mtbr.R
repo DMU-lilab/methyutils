@@ -66,7 +66,13 @@ GetCGmtbr <- function(mtbr, cg.position){
 	mtbr$strand[mtbr$strand == "-"] <- "n"
 	cg.position[which(cg.position) + 1] <- TRUE
 	cg.mtbr <- mtbr[cg.position[mtbr$posi],]
-	
+	##add tow row 
+	addtworows <- cg.mtbr[1:2,]
+	addtworows$posi <- c(-2:-1)
+	addtworows$strand <- c("p","n")
+	cg.mtbr <- rbind(cg.mtbr,addtworows)
+	##	
+
 	m <- melt(cg.mtbr, id=c("chrom","posi","strand"), variable.name="read", value.name="cv") 
 	
 	m$posi <- ifelse(m$strand== "n",m$posi-1,m$posi)
@@ -75,7 +81,10 @@ GetCGmtbr <- function(mtbr, cg.position){
 	cst <- dcast(m, chrom + posi ~ read + strand, value.var="cv")
 	cst$posi <- as.integer(cst$posi)
 	cst[is.na(cst)] <- 0
-			
+	
+	##remove one row
+	cst <- cst[-1,]
+	##		
 	return(cst)
 }
 
@@ -105,13 +114,21 @@ WriteSeparatedWig <- function(cgmtbr,wigfilePath,chr){
 	Sn <- data.frame(posi=cgmtbr$posi+1,score=(-cgmtbr$rC_n/(cgmtbr$rC_n + cgmtbr$rT_n)))
 	Sn <- Sn[!is.na(Sn$score),]
 	Sn <- Sn[Sn$score<0,]
+	#
+	Sn$posi <- as.integer(Sn$posi)
+	#
 	Rmn <- data.frame(posi=cgmtbr$posi+1,score=-cgmtbr$rC_n)
 	Rmn <- Rmn[!is.na(Rmn$score),]
 	Rmn <- Rmn[Rmn$score<0,]
+	#
+	Rmn$posi <- as.integer(Rmn$posi)
+	#
 	Rtotaln <- data.frame(posi=cgmtbr$posi+1,score=-(cgmtbr$rC_n + cgmtbr$rT_n))
 	Rtotaln <- Rtotaln[!is.na(Rtotaln$score),]
 	Rtotaln <- Rtotaln[Rtotaln$score<0,]
-	
+	#
+	Rtotaln$posi <- as.integer(Rtotaln$posi)
+	#
 	## save the wig file 
 	
 	Spf <- file.path(wigfilePath,"methy.score_p.wig")
@@ -179,7 +196,7 @@ GetValueFromMtbrByRegion <- function(cg.mtbr,region,genome="mm9"){
 		chr <- unique(cg.mtbr$chrom)
 			
 		if(genome == "mm9"){
-			library("BSgenome.Hsapiens.UCSC.hg19")
+			library("BSgenome.Mmusculus.UCSC.mm9")
 			dna.seq <- Mmusculus[[chr]]
 		}else if (genome == "hg19"){
 			library("BSgenome.Hsapiens.UCSC.hg19")
@@ -274,7 +291,7 @@ cgDensity <- function(cg.mtbr,genome="mm9",window=300,maxpercent=0.005,overlap=4
 	chr <- unique(cg.mtbr$chrom)
 			
 	if(genome == "mm9"){
-		library("BSgenome.Hsapiens.UCSC.hg19")
+		library("BSgenome.Mmusculus.UCSC.mm9")
 		dna.seq <- Mmusculus[[chr]]
 	}else if (genome == "hg19"){
 		library("BSgenome.Hsapiens.UCSC.hg19")
