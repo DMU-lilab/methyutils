@@ -296,8 +296,12 @@ cgDensity <- function(cg.mtbr,genome="mm9",window=300,maxpercent=0.005,overlap=4
 	}else if (genome == "hg19"){
 		library("BSgenome.Hsapiens.UCSC.hg19")
 		dna.seq <- Hsapiens[[chr]]
+	}else if (genome == "hg38"){
+                library("BSgenome.Hsapiens.UCSC.hg38")
+                dna.seq <- Hsapiens[[chr]]
+
 	}else {
-		 stop("undefined genome. Only mm9 and hg19 are available now.")
+		 stop("undefined genome. Only mm9 and hg19,hg38 are available now.")
 	}
 		
 	## get the CG positon
